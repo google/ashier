@@ -1,0 +1,205 @@
+#!/usr/bin/python
+#
+# Copyright 2011 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Ashier: Template-based scripting for terminal interactions.
+
+Ashier is a program that serves the same purpose as expect(1): it helps
+users script terminal interactions. However, unlike expect, Ashier is
+programming language agnostic and provides a readable template language
+for terminal output matching. These features make scripted terminal
+interactions simpler to create and easier to maintain.
+"""
+
+__author__ = 'cklin@google.com (Chuan-kai Lin)'
+
+import optparse
+import os
+import select
+import signal
+import sys
+
+from ashierlib import directive
+from ashierlib import linebuf
+from ashierlib import reactive
+from ashierlib import terminal
+from ashierlib import utils
+
+
+def React(nesting, buf, reacts, channels):
+  """Run through pattern-triggered actions.
+
+  Run through all reactions in last-line-to-match incremental order
+  and update line buffer baseline when buffered lnies are no longer
+  needed.
+
+  Args:
+    nesting: persistent state to support nested matching.
+      Initialize with a fresh empty mutable list and reuse the same
+      list for subsequent calls.
+    buf: a Buffer object that contains the terminal output to match.
+    reacts: list of Reaction objects to run through.
+    channels: dictionary that maps channel names (which are strings)
+      to the corresponding writable file descriptors.
+  """
+
+  # bound points to the line in the buffer that should be matched to
+  # the last line of a pattern.  For example, if bound=335 in a loop
+  # iteration, and the pattern in the Reactive object r has three
+  # lines, then the loop body will try to match the pattern to lines
+  # 333, 334, and 335.  We start with the lowest meaningful bound
+  # value (bound=buf.baseline) and increment it in the outer loop.
+  bound = buf.baseline
+  while bound < buf.GetBound():
+
+    # next_baseline indicates which lines in the buffer need to be
+    # retained because they may contribute to future matches in the
+    # next outer-loop iteration.  next_baseline=334 means that lines
+    # 1-333 can be dropped because they will never contribute to a
+    # positive match once the current outer loop iteration completes.
+    # The loop starts with next_baseline=buf.GetBound(), which means
+    # that all lines in the buffer can be dropped, and lower it with
+    # the return values from r.React.
+    next_baseline = buf.GetBound()
+    for r in reacts:
+      waterline = r.React(nesting, buf, bound+1, channels)
+
+      # A negative waterline means that there was a positive match
+      # that ends at line number -(waterline-1).  In this case we
+      # discard the matched lines by lifting the buffer baseline to
+      # -waterline and update bound accordingly.
+      if waterline < 0:
+        buf.UpdateBaseline(-waterline)
+        bound = buf.baseline
+        break
+
+      # A positive waterline means that there was no positive match,
+      # and line next_baseline could contribute to future matches.  In
+      # this case we update waterline to next_baseline if the latter
+      # has a smaller value.
+      next_baseline = min(waterline, next_baseline)
+
+    # If there is no positive match in the entire outer loop
+    # iteration, drop unneeded lines from the buffer and increment the
+    # bound variable.
+    else:
+      buf.UpdateBaseline(next_baseline)
+      bound += 1
+
+
+def CreateReactives(files):
+  """Create reaction objects from files.
+
+  Args:
+    files: a list of configuration filenames.
+
+  Returns:
+    A list of reactive.Reactive objects.
+  """
+
+  lines = []
+  for f in files:
+    lines.extend(directive.CreateLines(f))
+
+  directives = [directive.ParseDirective(l) for l in lines]
+  groups = utils.SplitNone(directives)
+
+  nesting = []
+  reacts = [reactive.Reactive(nesting, g) for g in groups]
+  reacts.sort(key=lambda r: r.PatternSize(), reverse=True)
+  return reacts
+
+
+ashier_description = """
+Ashier is a program that serves the same purpose as expect(1): it helps
+users script terminal interactions. However, unlike expect, Ashier is
+programming language agnostic and provides a readable template language
+for terminal output matching. These features make scripted terminal
+interactions simpler to create and easier to maintain.
+"""
+
+ashier_args = """
+The mandatory command arguments specify how Ashier should launch the
+controller process, which oversees the scripted interaction.
+"""
+
+
+def _ParseOptions():
+  parser = optparse.OptionParser(
+      usage='%prog [options] command',
+      version='ashier 1.0.0',
+      description=ashier_description.lstrip(),
+      epilog=ashier_args.lstrip())
+  parser.add_option(
+      '-c', dest='configs', action='append',
+      help='load reaction configuration from FILE', metavar='FILE')
+  option, args = parser.parse_args()
+
+  if not args:
+    parser.print_help()
+    print
+    utils.ReportError('missing mandatory command arguments')
+    utils.AbortOnError()
+
+  return option.configs or [], args
+
+
+def main():
+  configs, controller = _ParseOptions()
+  reacts = CreateReactives(configs)
+  utils.AbortOnError()
+
+  stdin_fd = sys.stdin.fileno()
+  stdout_fd = sys.stdout.fileno()
+  buf = linebuf.Buffer()
+
+  unused_child_pid, child_fd = terminal.SpawnPTY(['/bin/sh'])
+  if os.isatty(stdin_fd):
+    terminal.MatchWindowSize(stdin_fd, child_fd)
+    terminal.SetTerminalRaw(stdin_fd, restore=True)
+
+  control_pid, control_fd = terminal.SpawnPTY(controller)
+  terminal.SetTerminalRaw(control_fd)
+
+  nesting = []
+  channels = {'controller': control_fd, 'terminal': child_fd}
+
+  def StdinReady(event):
+    if event & select.POLLIN:
+      terminal.CopyData(stdin_fd, child_fd)
+
+  def ChildReady(event):
+    if event & select.POLLIN:
+      data = terminal.CopyData(child_fd, stdout_fd)
+      buf.AppendRawData(data)
+      React(nesting, buf, reacts, channels)
+    elif event & select.POLLHUP:
+      os.kill(control_pid, signal.SIGTERM)
+      sys.exit(0)
+
+  def ControlReady(event):
+    if event & select.POLLIN:
+      terminal.CopyData(control_fd, child_fd)
+    elif event & select.POLLHUP:
+      os.close(control_fd)
+
+  terminal.AsyncIOLoop(
+      {stdin_fd: StdinReady,
+       child_fd: ChildReady,
+       control_fd: ControlReady})
+
+
+if __name__ == '__main__':
+  main()
