@@ -218,11 +218,20 @@ class Reactive(object):
     """
 
     # If this Reactive object is inactive because one of its enclosing
-    # objects had not been matched, do not continue with matching.
+    # objects had not been matched, or that a non-enclosing object with
+    # lower indentation had been matched, do not continue with matching.
     # Return buf.GetBound() to indicate that this particular Reactive
     # object places no restrictions on how much the buffer baseline
     # can be raised.
-    if nesting[:len(self._nesting)-1] != self._nesting[:-1]:
+
+    # For the Reactive object to be active, the only nesting entries
+    # in the current matching context (nesting) with lower indentation
+    # should be exactly the nesting entries of the enclosing Reactive
+    # objects (self._nesting[:-1]).
+    self_indentation = self._nesting[-1][0]
+    def LowerIndentation(nest):
+      return nest[0] < self_indentation
+    if filter(LowerIndentation, nesting) != self._nesting[:-1]:
       return buf.GetBound()
 
     # If some of the lines needed for the current match no longer

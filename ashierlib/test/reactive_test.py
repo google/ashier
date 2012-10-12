@@ -138,7 +138,7 @@ class TestReactive(unittest.TestCase):
     self.DoTestReact([], [' >\tFoo', ' >'], 'Foo\nBar', [], -2)
     self.DoTestReact([], [' >\tFoo', ' >'], 'FooBar\n', [], 2)
     self.DoTestReact([], [' >\tFoo', ' >\tB'], 'Foo\nBar', [], -3)
-    self.DoTestReact([], [' >\tFoo'], 'Foo', [(0, 0)], -2)
+    self.DoTestReact([], [' >\tFoo'], 'Foo', [(0, 0)], 2)
     self.DoTestReact([(0, 0)], [' >\tFoo'], 'Foo', [(0, 0)], -2)
     self.DoTestReact([(0, 0)], [' >\tFoo'], 'Foo', [], 2)
 
