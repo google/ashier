@@ -91,7 +91,11 @@ class TestParseDirective(unittest.TestCase):
     """
 
     self.DoTestParseError('string')
+    self.DoTestParseError('>\t')
+    self.DoTestParseError('>abc\tdef')
     self.DoTestParseError('?')
+    self.DoTestParseError('?\t')
+    self.DoTestParseError('?  \t  ...')
     self.DoTestParseError('? name')
     self.DoTestParseError('? . name /regex')
     self.DoTestParseError('!')
@@ -109,12 +113,10 @@ class TestParseDirective(unittest.TestCase):
     """Test Template directive parsing."""
 
     self.DoTestParseTemplate('>', '')
-    self.DoTestParseTemplate('>\t', '')
-    self.DoTestParseTemplate(' >\t', '')
-    self.DoTestParseTemplate('>\tabc', 'abc')
-    self.DoTestParseTemplate(' >\tabc', 'abc')
-    self.DoTestParseTemplate('>\tabc def ', 'abc def ')
-    self.DoTestParseTemplate('>\tabc\tdef ', 'abc     def ')
+    self.DoTestParseTemplate('>abc', 'abc')
+    self.DoTestParseTemplate(' >abc', 'abc')
+    self.DoTestParseTemplate('>abc def ', 'abc def ')
+    self.DoTestParseTemplate('>abc   def ', 'abc   def ')
 
   def DoTestParseMarker(self, content, start, finish, name, regex):
     utils._error_messages = []
@@ -129,12 +131,11 @@ class TestParseDirective(unittest.TestCase):
   def testParseMarker(self):
     """Test Marker directive parsing."""
 
-    self.DoTestParseMarker('?\t.', 0, 1, None, '')
-    self.DoTestParseMarker('?\t\t...', 8, 11, None, '')
-    self.DoTestParseMarker('?\t     ....', 5, 9, None, '')
-    self.DoTestParseMarker('?\t . zeros', 1, 2, 'zeros', '')
-    self.DoTestParseMarker('?\t . /0+/', 1, 2, None, '0+')
-    self.DoTestParseMarker('?\t . zeros /0+/', 1, 2, 'zeros', '0+')
+    self.DoTestParseMarker('?.', 0, 1, None, '')
+    self.DoTestParseMarker('?     ....', 5, 9, None, '')
+    self.DoTestParseMarker('? . zeros', 1, 2, 'zeros', '')
+    self.DoTestParseMarker('? . /0+/', 1, 2, None, '0+')
+    self.DoTestParseMarker('? . zeros /0+/', 1, 2, 'zeros', '0+')
 
   def DoTestParseSend(self, content, channel, message):
     utils._error_messages = []
@@ -149,11 +150,11 @@ class TestParseDirective(unittest.TestCase):
   def testParseSend(self):
     """Test Send directive parsing."""
 
+    self.DoTestParseSend('!terminal "a"', 'terminal', 'a')
     self.DoTestParseSend('! terminal "a"', 'terminal', 'a')
-    self.DoTestParseSend('! controller "abc def"',
-                         'controller', 'abc def')
-    self.DoTestParseSend('! controller "abc "def""',
-                         'controller', 'abc "def"')
+    self.DoTestParseSend('!controller "ab c"', 'controller', 'ab c')
+    self.DoTestParseSend('! controller "ab c"', 'controller', 'ab c')
+    self.DoTestParseSend('! controller "a "bc""', 'controller', 'a "bc"')
 
 
 class TestTemplate(unittest.TestCase):
@@ -178,7 +179,6 @@ class TestTemplate(unittest.TestCase):
     self.DoTestInferSkip('abc def', 2, 4, r'c\s+')
     self.DoTestInferSkip('abc def', 2, 5, r'c\s+d')
     self.DoTestInferSkip('abc  def', 2, 6, r'c\s+d')
-    self.DoTestInferSkip('abc \tdef', 2, 6, r'c\s+d')
 
   def DoTestInferSkipError(self, sample, start, finish):
     self.DoSetup(sample, start, finish)
@@ -194,7 +194,7 @@ class TestTemplate(unittest.TestCase):
     """
 
     self.DoTestInferSkipError('ab  ', 1, 3)
-    self.DoTestInferSkipError('ab \t', 1, 3)
+    self.DoTestInferSkipError('ab   ', 1, 3)
 
 
 class TestMarker(unittest.TestCase):
@@ -218,7 +218,7 @@ class TestMarker(unittest.TestCase):
     self.DoTestInferRegex('abc', 0, 2, '[^c]+')
     self.DoTestInferRegex('abc', 0, 3, '.+')
     self.DoTestInferRegex('abc def', 0, 3, r'[^\s]+')
-    self.DoTestInferRegex('abc\tdef', 0, 3, r'[^\s]+')
+    self.DoTestInferRegex('abc  def', 0, 3, r'[^\s]+')
 
   def DoTestInferRegexError(self, sample, start, finish):
     self.DoSetup(sample, start, finish)

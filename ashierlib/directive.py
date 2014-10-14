@@ -127,20 +127,21 @@ def ParseDirective(line):
 
   source = line.StrippedContent()
 
-  if source.startswith('>'):
-    if source == '>':
-      return Template(line, '')
-    elif source.startswith('>\t'):
-      return Template(line, source[2:].expandtabs(8))
-    else:
-      line.ReportError('> needs to be followed by TAB')
+  if source.startswith('#') or not source:
+    return None
+
+  elif '\t' in source:
+    line.ReportError('unexpected TAB in directive')
+
+  elif source.startswith('>'):
+    return Template(line, source[1:])
 
   elif source.startswith('?'):
     if source == '?':
       line.ReportError('empty marker directive')
-    elif source.startswith('?\t'):
+    else:
       syntax = re.compile(r' *(\.+) *(\w+)? *(?:/(.+)/)? *$')
-      matches = syntax.match(source[2:].expandtabs(8))
+      matches = syntax.match(source[1:])
       if matches:
         start, finish = matches.span(1)
         name = matches.group(2)
@@ -148,14 +149,12 @@ def ParseDirective(line):
         return Marker(line, start, finish, name, regex)
       else:
         line.ReportError('malformed marker directive')
-    else:
-      line.ReportError('? needs to be followed by TAB')
 
   elif source.startswith('!'):
     if source == '!':
       line.ReportError('empty action directive')
     else:
-      syntax = re.compile(r' +(\w+) +"(.*)" *$')
+      syntax = re.compile(r' *(\w+) +"(.*)" *$')
       matches = syntax.match(source[1:])
       if matches:
         channel = matches.group(1)
@@ -164,8 +163,9 @@ def ParseDirective(line):
       else:
         line.ReportError('malformed action directive')
 
-  elif source and not source.startswith('#'):
+  else:
     line.ReportError('unrecognized directive syntax')
+
   return None
 
 

@@ -116,11 +116,11 @@ class TestReactive(unittest.TestCase):
     report an error.
     """
 
-    self.DoTestInitErrors(['?\t  ....'])
-    self.DoTestInitErrors(['>\tFoo', ' >\tBar'])
-    self.DoTestInitErrors([' >\tFoo', '>\tBar'])
-    self.DoTestInitErrors(['! terminal "abc"', '>\tBar'])
-    self.DoTestInitErrors(['! terminal "abc"', '?\t .'])
+    self.DoTestInitErrors(['?  ....'])
+    self.DoTestInitErrors(['>Foo', ' >Bar'])
+    self.DoTestInitErrors([' >Foo', '>Bar'])
+    self.DoTestInitErrors(['! terminal "abc"', '>Bar'])
+    self.DoTestInitErrors(['! terminal "abc"', '? .'])
 
   def DoTestReact(self, config_nesting, config, text, nesting, retval):
     react = self.DoSetup(config_nesting, config)
@@ -133,14 +133,14 @@ class TestReactive(unittest.TestCase):
   def testReact(self):
     """Test React input matching."""
 
-    self.DoTestReact([], [' >\tFoo'], 'Foo', [], -2)
-    self.DoTestReact([], [' >\tFoo'], 'FooBar', [], -2)
-    self.DoTestReact([], [' >\tFoo', ' >'], 'Foo\nBar', [], -2)
-    self.DoTestReact([], [' >\tFoo', ' >'], 'FooBar\n', [], 2)
-    self.DoTestReact([], [' >\tFoo', ' >\tB'], 'Foo\nBar', [], -3)
-    self.DoTestReact([], [' >\tFoo'], 'Foo', [(0, 0)], 2)
-    self.DoTestReact([(0, 0)], [' >\tFoo'], 'Foo', [(0, 0)], -2)
-    self.DoTestReact([(0, 0)], [' >\tFoo'], 'Foo', [], 2)
+    self.DoTestReact([], [' >Foo'], 'Foo', [], -2)
+    self.DoTestReact([], [' >Foo'], 'FooBar', [], -2)
+    self.DoTestReact([], [' >Foo', ' >'], 'Foo\nBar', [], -2)
+    self.DoTestReact([], [' >Foo', ' >'], 'FooBar\n', [], 2)
+    self.DoTestReact([], [' >Foo', ' >B'], 'Foo\nBar', [], -3)
+    self.DoTestReact([], [' >Foo'], 'Foo', [(0, 0)], 2)
+    self.DoTestReact([(0, 0)], [' >Foo'], 'Foo', [(0, 0)], -2)
+    self.DoTestReact([(0, 0)], [' >Foo'], 'Foo', [], 2)
 
 
 if __name__ == '__main__':
