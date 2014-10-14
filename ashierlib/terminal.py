@@ -103,7 +103,7 @@ def SpawnPTY(argv):
   if pid == 0:
     try:
       os.execvp(argv[0], argv)
-    except OSError, err:
+    except OSError as err:
       print "# Error: cannot execute program '%s'" % argv[0]
       print '# %s\n%s' % (str(err), chr(4))
       sys.exit(1)

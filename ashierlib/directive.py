@@ -50,7 +50,7 @@ def CreateLines(filename):
         lines.append(Line(filename, lineno, line))
         lineno += 1
     return lines
-  except IOError, err:
+  except IOError as err:
     utils.ReportError(str(err))
     return ''
 
