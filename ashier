@@ -131,14 +131,14 @@ interactions simpler to create and easier to maintain.
 """
 
 ashier_args = """
-The mandatory command arguments specify how Ashier should launch the
+The optional command arguments specify how Ashier should launch the
 controller process, which oversees the scripted interaction.
 """
 
 
 def _ParseOptions():
   parser = optparse.OptionParser(
-      usage='%prog [options] command',
+      usage='%prog [options] [command]',
       version='ashier 1.0.0',
       description=ashier_description.lstrip(),
       epilog=ashier_args.lstrip())
@@ -148,10 +148,7 @@ def _ParseOptions():
   option, args = parser.parse_args()
 
   if not args:
-    parser.print_help()
-    print
-    utils.ReportError('missing mandatory command arguments')
-    utils.AbortOnError()
+    args = ['/bin/true']
 
   return option.configs or [], args
 
