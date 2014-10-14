@@ -29,7 +29,7 @@ setup(
     version='1.0.0',
     author='Chuan-kai Lin',
     author_email='cklin@google.com',
-    url='https://code.google.com/p/ashier',
+    url='https://github.com/google/ashier',
     description='Template-based scripting for terminal interactions',
     long_description=ashier_description,
     classifiers=[
