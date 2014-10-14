@@ -125,8 +125,12 @@ def CopyData(from_fd, to_fd, size=1024):
     A string that contains the bytes read and copied.
   """
 
-  data = os.read(from_fd, size)
-  os.write(to_fd, data)
+  data = ''
+  try:
+    data = os.read(from_fd, size)
+    os.write(to_fd, data)
+  except OSError:
+    pass
   return data
 
 

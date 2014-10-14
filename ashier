@@ -193,6 +193,8 @@ def main():
     if event & select.POLLIN:
       terminal.CopyData(control_fd, child_fd)
     elif event & select.POLLHUP:
+      # One last attempt to drain controller output
+      terminal.CopyData(control_fd, child_fd)
       os.close(control_fd)
 
   terminal.AsyncIOLoop(
